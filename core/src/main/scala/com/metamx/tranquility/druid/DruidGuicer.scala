@@ -31,7 +31,7 @@ import io.druid.guice.ExtensionsConfig
 import io.druid.guice.FirehoseModule
 import io.druid.guice.JsonConfigProvider
 import io.druid.guice.LifecycleModule
-import io.druid.guice.QueryableModule
+import io.druid.guice.ExpressionModule
 import io.druid.guice.ServerModule
 import io.druid.guice.annotations.Json
 import io.druid.guice.annotations.Self
@@ -103,7 +103,7 @@ class DruidGuicer(props: Properties)
       new LifecycleModule,
       new FirehoseModule,
       new ServerModule,
-      new QueryableModule,
+      new ExpressionModule,
       extensionsConfigModule
     ) map toGuiceModule
     val moreModules = Seq(
