@@ -12,7 +12,7 @@ val jacksonOneVersion = "1.9.13"
 // See https://github.com/druid-io/druid/pull/1669, https://github.com/druid-io/tranquility/pull/81 before upgrading Jackson
 val jacksonTwoVersion = "2.4.6"
 val jacksonTwoModuleScalaVersion = "2.4.5"
-val druidVersion = "spotx-0.11.0-SNAPSHOT"
+val druidVersion = "0.11.0-rc2-SNAPSHOT"
 val curatorVersion = "2.12.0"
 val guiceVersion = "4.0"
 val flinkVersion = "1.0.3"
@@ -78,6 +78,7 @@ val coreDependencies = Seq(
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonTwoModuleScalaVersion force()
 ) ++ Seq(
   dependOnDruid("druid-server"),
+  dependOnDruid("druid-sql"),
   "com.google.inject" % "guice" % guiceVersion force(),
   "com.google.inject.extensions" % "guice-servlet" % guiceVersion force(),
   "com.google.inject.extensions" % "guice-multibindings" % guiceVersion force(),
@@ -177,7 +178,7 @@ val kafkaTestDependencies = Seq(
 
 lazy val commonSettings = Seq(
   organization := "io.druid",
-
+  resolvers += Resolver.mavenLocal,
   javaOptions := Seq("-Xms512m", "-Xmx512m", "-XX:MaxPermSize=256M"),
 
   // Target Java 7
