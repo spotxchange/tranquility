@@ -12,7 +12,7 @@ val jacksonOneVersion = "1.9.13"
 // See https://github.com/druid-io/druid/pull/1669, https://github.com/druid-io/tranquility/pull/81 before upgrading Jackson
 val jacksonTwoVersion = "2.4.6"
 val jacksonTwoModuleScalaVersion = "2.4.5"
-val druidVersion = "0.10.1"
+val druidVersion = "spotx-0.11.0-SNAPSHOT"
 val curatorVersion = "2.12.0"
 val guiceVersion = "4.0"
 val flinkVersion = "1.0.3"
@@ -40,6 +40,7 @@ def dependOnDruid(artifact: String) = {
     exclude("org.apache.curator", "curator-x-discovery")
     exclude("com.lmax", "disruptor") // Pulled in by log4j2, conflicts with the one Storm wants.
     exclude("com.google.code.findbugs", "annotations") // Not needed, unwanted LGPL license (see https://github.com/druid-io/druid/issues/3866)
+    exclude("com.metamx","emitter") // Scala-util uses an older version
     force())
 }
 
