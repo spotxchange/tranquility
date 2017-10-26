@@ -199,7 +199,7 @@ public class KafkaConsumerTest
     );
 
     // commitMillis is set high enough that the commit thread should not run during the test
-    KafkaConsumer kafkaConsumer = new KafkaConsumer(
+    FlushingKafkaConsumer kafkaConsumer = new FlushingKafkaConsumer(
         config,
         consumerProperties,
         datasourceConfigs,
@@ -284,7 +284,7 @@ public class KafkaConsumerTest
     );
 
     // commitMillis is set high enough that the commit thread should not run during the test
-    KafkaConsumer kafkaConsumer = new KafkaConsumer(
+    FlushingKafkaConsumer kafkaConsumer = new FlushingKafkaConsumer(
         config,
         consumerProperties,
         datasourceConfigs,

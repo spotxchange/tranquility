@@ -18,27 +18,19 @@
  */
 package com.metamx.tranquility.kafka;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.metamx.common.logger.Logger;
 import com.metamx.tranquility.config.DataSourceConfig;
 import com.metamx.tranquility.kafka.model.MessageCounters;
 import com.metamx.tranquility.kafka.model.PropertiesBasedKafkaConfig;
+import com.metamx.tranquility.kafka.writer.TranquilityEventWriter;
 import com.metamx.tranquility.kafka.writer.WriterController;
 import io.druid.concurrent.Execs;
-import kafka.consumer.Consumer;
-import kafka.consumer.ConsumerConfig;
-import kafka.consumer.KafkaStream;
-import kafka.consumer.TopicFilter;
-import kafka.consumer.Whitelist;
-import kafka.javaapi.consumer.ConsumerConnector;
-import kafka.message.MessageAndMetadata;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -50,9 +42,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * guarantees that any events in Kafka will be read at least once even in case of a failure condition but does not
  * guarantee that duplication will not occur.
  */
-public class KafkaConsumer
+public class FlushingKafkaConsumer
 {
-  private static final Logger log = new Logger(KafkaConsumer.class);
+  private static final Logger log = new Logger(FlushingKafkaConsumer.class);
 
   private final ExecutorService consumerExec;
   private final Thread commitThread;
@@ -61,15 +53,16 @@ public class KafkaConsumer
   // prevents reading the next event from Kafka while events are being flushed and offset is being committed to ZK
   private final ReentrantReadWriteLock commitLock = new ReentrantReadWriteLock();
 
-  private final ConsumerConnector consumerConnector;
-  private final TopicFilter topicFilter;
+  private final KafkaConsumer consumerConnector;
+//  private final TopicFilter topicFilter;
+  private final List<String> topics;
   private final int numThreads;
   private final int commitMillis;
   private final WriterController writerController;
 
   private Map<String, MessageCounters> previousMessageCounters = new HashMap<>();
 
-  public KafkaConsumer(
+  public FlushingKafkaConsumer(
       final PropertiesBasedKafkaConfig globalConfig,
       final Properties kafkaProperties,
       final Map<String, DataSourceConfig<PropertiesBasedKafkaConfig>> dataSourceConfigs,
@@ -77,9 +70,9 @@ public class KafkaConsumer
   )
   {
     this.consumerConnector = getConsumerConnector(kafkaProperties);
-    this.topicFilter = new Whitelist(buildTopicFilter(dataSourceConfigs));
+    this.topics = Arrays.asList( "market.forecast");
 
-    log.info("Kafka topic filter [%s]", this.topicFilter);
+    log.info("Kafka topic [%s]", this.topics);
 
     int defaultNumThreads = Math.max(1, Runtime.getRuntime().availableProcessors() - 1);
     this.numThreads = globalConfig.getConsumerNumThreads() > 0
@@ -88,9 +81,9 @@ public class KafkaConsumer
 
     this.commitMillis = globalConfig.getCommitPeriodMillis();
     this.writerController = writerController;
-    this.consumerExec = Execs.multiThreaded(numThreads, "KafkaConsumer-%d");
+    this.consumerExec = Execs.multiThreaded(numThreads, "FlushingKafkaConsumer-%d");
     this.commitThread = new Thread(createCommitRunnable());
-    this.commitThread.setName("KafkaConsumer-CommitThread");
+    this.commitThread.setName("FlushingKafkaConsumer-CommitThread");
     this.commitThread.setDaemon(true);
   }
 
@@ -110,11 +103,11 @@ public class KafkaConsumer
         try {
           writerController.flushAll(); // try to flush the remaining events to Druid
           writerController.stop();
-          consumerConnector.commitOffsets(); // update commit offset
+          consumerConnector.commitSync(); // update commit offset
         }
         finally {
           commitLock.writeLock().unlock();
-          consumerConnector.shutdown();
+          consumerConnector.close();
           commitThread.interrupt();
           consumerExec.shutdownNow();
         }
@@ -141,7 +134,7 @@ public class KafkaConsumer
       final Map<String, MessageCounters> messageCounters = writerController.flushAll(); // blocks until complete
 
       final long commitStartTime = System.currentTimeMillis();
-      consumerConnector.commitOffsets();
+      consumerConnector.commitSync();
 
       final long finishedTime = System.currentTimeMillis();
       Map<String, MessageCounters> countsSinceLastCommit = new HashMap();
@@ -198,12 +191,18 @@ public class KafkaConsumer
 
   private void startConsumers()
   {
-    final List<KafkaStream<byte[], byte[]>> kafkaStreams = consumerConnector.createMessageStreamsByFilter(
-        topicFilter,
-        numThreads
-    );
 
-    for (final KafkaStream<byte[], byte[]> kafkaStream : kafkaStreams) {
+    // For committing offset
+//    consumer.commitSync();
+
+    consumerConnector.subscribe(topics);
+
+//    final List<KafkaStream<byte[], byte[]>> kafkaStreams = consumerConnector.createMessageStreamsByFilter(
+//        topicFilter,
+//        numThreads
+//    );
+
+
       consumerExec.submit(
           new Runnable()
           {
@@ -211,9 +210,9 @@ public class KafkaConsumer
             public void run()
             {
               try {
-                final Iterator<MessageAndMetadata<byte[], byte[]>> kafkaIterator = kafkaStream.iterator();
+//                final Iterator<MessageAndMetadata<byte[], byte[]>> kafkaIterator = kafkaStream.iterator();
 
-                while (kafkaIterator.hasNext()) {
+                while (true) {
                   if (Thread.currentThread().isInterrupted()) {
                     throw new InterruptedException();
                   }
@@ -227,12 +226,18 @@ public class KafkaConsumer
                   commitLock.readLock().lockInterruptibly();
 
                   try {
-                    MessageAndMetadata<byte[], byte[]> data = kafkaIterator.next();
-                    writerController.getWriter(data.topic()).send(data.message());
+                    ConsumerRecords<byte[], byte[]> data = consumerConnector.poll(100);
+                    TranquilityEventWriter writer = writerController.getWriter("market.forecast");
+
+                    for (ConsumerRecord<byte[], byte[]> message : data) {
+                      writer.send(message.value());
+                    }
                   }
                   finally {
                     commitLock.readLock().unlock();
                   }
+
+
                 }
               }
               catch (InterruptedException e) {
@@ -248,17 +253,17 @@ public class KafkaConsumer
             }
           }
       );
-    }
   }
 
-  private static ConsumerConnector getConsumerConnector(final Properties props)
+  private static KafkaConsumer<byte[], byte[]> getConsumerConnector(final Properties props)
   {
-    props.setProperty("auto.commit.enable", "false");
+    props.setProperty("enable.auto.commit", "false");
+//    props.setProperty("auto.commit.enable", "false");
+//
+//    final ConsumerConfig config = new ConsumerConfig(props);
+//    Preconditions.checkState(!config.autoCommitEnable(), "autocommit must be off");
 
-    final ConsumerConfig config = new ConsumerConfig(props);
-    Preconditions.checkState(!config.autoCommitEnable(), "autocommit must be off");
-
-    return Consumer.createJavaConsumerConnector(config);
+    return new KafkaConsumer<>(props);
   }
 
   private static String buildTopicFilter(Map<String, DataSourceConfig<PropertiesBasedKafkaConfig>> dataSourceConfigs)

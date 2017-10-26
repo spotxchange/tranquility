@@ -120,7 +120,7 @@ public class KafkaMain
     }
 
     final WriterController writerController = new WriterController(dataSourceConfigs);
-    final KafkaConsumer kafkaConsumer = new KafkaConsumer(
+    final FlushingKafkaConsumer kafkaConsumer = new FlushingKafkaConsumer(
         globalConfig,
         kafkaProperties,
         dataSourceConfigs,
