@@ -8,9 +8,6 @@ parallelExecution in Test := false
 
 concurrentRestrictions in Global += Tags.limitAll(1)
 
-resolvers += "nexus" at "http://ninja001.hq.booyahnetworks.com/nexus/repository/maven-releases/"
-resolvers += "nexus-snapshots" at "http://ninja001.hq.booyahnetworks.com/nexus/repository/maven-snapshots/"
-
 val jacksonOneVersion = "1.9.13"
 // See https://github.com/druid-io/druid/pull/1669, https://github.com/druid-io/tranquility/pull/81 before upgrading Jackson
 val jacksonTwoVersion = "2.4.6"
@@ -182,6 +179,8 @@ val kafkaTestDependencies = Seq(
 lazy val commonSettings = Seq(
   organization := "io.druid",
   resolvers += Resolver.mavenLocal,
+  resolvers += "nexus" at "http://ninja001.hq.booyahnetworks.com/nexus/repository/maven-releases/",
+  resolvers += "nexus-snapshots" at "http://ninja001.hq.booyahnetworks.com/nexus/repository/maven-snapshots/",
   javaOptions := Seq("-Xms512m", "-Xmx512m", "-XX:MaxPermSize=256M"),
 
   // Target Java 7
