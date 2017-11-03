@@ -26,8 +26,8 @@ val apacheHttpVersion = "4.3.3"
 val kafkaVersion = "0.10.1.1"
 val airlineVersion = "0.7"
 
-def dependOnDruid(artifact: String) = {
-  ("io.druid" % artifact % druidVersion
+def dependOnDruid(artifact: String, group: String = "io.druid") = {
+  (group % artifact % druidVersion
     exclude("org.slf4j", "slf4j-log4j12")
     exclude("log4j", "log4j")
     exclude("org.apache.logging.log4j", "log4j-core")
@@ -41,6 +41,7 @@ def dependOnDruid(artifact: String) = {
     exclude("com.lmax", "disruptor") // Pulled in by log4j2, conflicts with the one Storm wants.
     exclude("com.google.code.findbugs", "annotations") // Not needed, unwanted LGPL license (see https://github.com/druid-io/druid/issues/3866)
     exclude("com.metamx","emitter") // Scala-util uses an older version
+    exclude("io.confluent","kafka-schema-registry-client")
     force())
 }
 
@@ -79,6 +80,8 @@ val coreDependencies = Seq(
 ) ++ Seq(
   dependOnDruid("druid-server"),
   dependOnDruid("druid-sql"),
+  dependOnDruid("druid-parquet-extensions","io.druid.extensions.contrib"),
+  dependOnDruid("druid-avro-extensions","io.druid.extensions"),
   "com.google.inject" % "guice" % guiceVersion force(),
   "com.google.inject.extensions" % "guice-servlet" % guiceVersion force(),
   "com.google.inject.extensions" % "guice-multibindings" % guiceVersion force(),
