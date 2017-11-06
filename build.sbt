@@ -41,7 +41,6 @@ def dependOnDruid(artifact: String, group: String = "io.druid") = {
     exclude("com.lmax", "disruptor") // Pulled in by log4j2, conflicts with the one Storm wants.
     exclude("com.google.code.findbugs", "annotations") // Not needed, unwanted LGPL license (see https://github.com/druid-io/druid/issues/3866)
     exclude("com.metamx","emitter") // Scala-util uses an older version
-    exclude("io.confluent","kafka-schema-registry-client")
     force())
 }
 
@@ -80,8 +79,6 @@ val coreDependencies = Seq(
 ) ++ Seq(
   dependOnDruid("druid-server"),
   dependOnDruid("druid-sql"),
-  dependOnDruid("druid-parquet-extensions","io.druid.extensions.contrib"),
-  dependOnDruid("druid-avro-extensions","io.druid.extensions"),
   "com.google.inject" % "guice" % guiceVersion force(),
   "com.google.inject.extensions" % "guice-servlet" % guiceVersion force(),
   "com.google.inject.extensions" % "guice-multibindings" % guiceVersion force(),
